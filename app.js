@@ -11,4 +11,6 @@ app.use(express.json());
 
 app.use(errorHandler);
 
+app.use("/api/users", userRoutes);
+
 module.exports = app;
