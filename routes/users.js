@@ -2,6 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const fs = require("fs-extra");
+const { authenticate } = require("../middleware/auth");
+const { isAdmin } = require("../middleware/isAdmin");
 
 const router = express.Router();
 const DATA_FILE = "./data/users.json";
@@ -58,6 +60,42 @@ router.post("/login", async (req, res) => {
     { expiresIn: "1h" }
   );
   res.status(200).json({ token });
+});
+
+// Create Admin
+router.post("/create-admin", authenticate, isAdmin, async (req, res) => {
+  const { username, password, name } = req.body;
+  const users = await loadUsers();
+  if (users.some((user) => user.username === username)) {
+    return res.status(400).json({ message: "Username already exists" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  users.push({
+    id: users.length + 1,
+    username,
+    password: hashedPassword,
+    name,
+    isAdmin: true,
+  });
+  await saveUsers(users);
+  res.status(201).json({ message: "Admin created successfully" });
+});
+
+// Delete User
+router.delete("/delete/:id", authenticate, isAdmin, async (req, res) => {
+  const { id } = req.params;
+  const users = await loadUsers();
+  const userIndex = users.findIndex((user) => user.id === parseInt(id));
+  if (userIndex === -1 || users[userIndex].isAdmin) {
+    return res
+      .status(404)
+      .json({ message: "User not found or cannot delete admin" });
+  }
+
+  users.splice(userIndex, 1);
+  await saveUsers(users);
+  res.status(200).json({ message: "User deleted successfully" });
 });
 
 module.exports = router;
