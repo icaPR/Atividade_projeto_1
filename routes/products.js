@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs-extra");
 const { authenticate } = require("../middleware/auth");
+const { isAdmin } = require("../middleware/isAdmin");
 const router = express.Router();
 
 const DATA_FILE = "./data/products.json";
@@ -57,6 +58,44 @@ router.post("/", authenticate, async (req, res) => {
   products.push(newProduct);
   await saveProducts(products);
   res.status(201).json(newProduct);
+});
+
+// Update Product
+router.put("/:id", authenticate, async (req, res) => {
+  const { name, price, categoryId } = req.body;
+  const products = await loadProducts();
+  const productIndex = products.findIndex(
+    (p) => p.id === parseInt(req.params.id)
+  );
+
+  if (productIndex === -1) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  products[productIndex] = {
+    ...products[productIndex],
+    name,
+    price,
+    categoryId,
+  };
+  await saveProducts(products);
+  res.status(200).json(products[productIndex]);
+});
+
+// Delete Product
+router.delete("/:id", authenticate, isAdmin, async (req, res) => {
+  const products = await loadProducts();
+  const productIndex = products.findIndex(
+    (p) => p.id === parseInt(req.params.id)
+  );
+
+  if (productIndex === -1) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  products.splice(productIndex, 1);
+  await saveProducts(products);
+  res.status(200).json({ message: "Product deleted successfully" });
 });
 
 module.exports = router;
