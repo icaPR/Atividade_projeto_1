@@ -2,6 +2,8 @@ const express = require("express");
 const fs = require("fs-extra");
 const { authenticate } = require("../middleware/auth");
 const { isAdmin } = require("../middleware/isAdmin");
+const { body, validationResult } = require("express-validator");
+
 const router = express.Router();
 
 const DATA_FILE = "./data/products.json";
@@ -41,24 +43,36 @@ router.get("/:id", async (req, res) => {
 });
 
 // Create Product
-router.post("/", authenticate, async (req, res) => {
-  const { name, price, categoryId } = req.body;
-  if (!name || !price || !categoryId) {
-    return res.status(400).json({ message: "All fields are required" });
+router.post(
+  "/",
+  authenticate,
+  [
+    body("name").notEmpty().withMessage("Name is required"),
+    body("price")
+      .isFloat({ gt: 0 })
+      .withMessage("Price must be greater than 0"),
+    body("categoryId").isInt().withMessage("Category ID must be an integer"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    const { name, price, categoryId } = req.body;
+
+    const products = await loadProducts();
+    const newProduct = {
+      id: products.length + 1,
+      name,
+      price,
+      categoryId,
+    };
+
+    products.push(newProduct);
+    await saveProducts(products);
+    res.status(201).json(newProduct);
   }
-
-  const products = await loadProducts();
-  const newProduct = {
-    id: products.length + 1,
-    name,
-    price,
-    categoryId,
-  };
-
-  products.push(newProduct);
-  await saveProducts(products);
-  res.status(201).json(newProduct);
-});
+);
 
 // Update Product
 router.put("/:id", authenticate, async (req, res) => {
